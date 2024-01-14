@@ -1,0 +1,4 @@
+baseURL = 'https://blog.ioutil.app'
+languageCode = 'en-us'
+title = 'Pragmatic Paths: I/O Util Tech Blog'
+theme = 'papermod'
