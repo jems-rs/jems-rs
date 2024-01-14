@@ -2,6 +2,7 @@
 title = 'Welcome to Pragmatic Paths: I/O Util Tech Blog'
 date = 2024-01-14T16:00:00+01:00
 published = true
+tags = ['welcome', 'about']
 +++
 
 ## A Warm Welcome

@@ -2,3 +2,49 @@ baseURL = 'https://blog.ioutil.app'
 languageCode = 'en-us'
 title = 'Pragmatic Paths: I/O Util Tech Blog'
 theme = 'papermod'
+sectionPagesMenu = 'main'
+
+[outputs]
+home = ['html', 'rss', 'json']
+
+[params]
+author = ['Jens']
+ShowCodeCopyButtons = true
+ShowPostNavLinks = true
+ShowToc = true
+ShowReadingTime = true
+# comments = true TODO add comments
+
+[params.homeInfoParams]
+Title = 'Hello, World!'
+Content = 'Pragmatic Paths: I/O Util - A blog about pragmatic paths in software development/engineering and tech.'
+
+[[params.socialIcons]]
+name = 'github'
+url = 'https://github.com/jensilo'
+
+[menus]
+[[menus.main]]
+name = 'Home'
+url = '/'
+weight = 10
+
+[[menus.main]]
+name = 'About'
+url = '/posts/welcome/'
+weight = 20
+
+[[menus.main]]
+name = 'Tags'
+url = '/tags/'
+weight = 30
+
+[[menus.main]]
+name = 'Archives'
+url = '/archives/'
+weight = 40
+
+[[menus.main]]
+name = 'Search'
+url = '/search/'
+weight = 50
