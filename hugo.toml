@@ -13,7 +13,7 @@ ShowCodeCopyButtons = true
 ShowPostNavLinks = true
 ShowToc = true
 ShowReadingTime = true
-# comments = true TODO add comments
+comments = true
 
 [params.homeInfoParams]
 Title = 'Hello, World!'
@@ -22,6 +22,12 @@ Content = 'Pragmatic Paths: I/O Util - A blog about pragmatic paths in software 
 [[params.socialIcons]]
 name = 'github'
 url = 'https://github.com/jensilo'
+
+[params.giscus]
+repo = 'jensilo/jensilo.github.io'
+repoId = 'R_kgDOIn-2QA'
+category = 'Announcements'
+categoryID = 'DIC_kwDOIn-2QM4Cdg1e'
 
 [menus]
 [[menus.main]]
