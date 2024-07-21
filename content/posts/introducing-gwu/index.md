@@ -88,24 +88,23 @@ Also, Schots misses, IMHO, some extra options to pass to a handler, like a logge
 Now, with fundamentals and considerations out of the way, let's start to implement our own version of generic web handlers.
 
 ### Implementation
-Firstly, from the incoming request `In` must be constructed, we'll define the `CnIn[In]` (construct input) function signature like this:
+Firstly, from the incoming request, `In` must be constructed. We'll define the `CnIn[In]` (construct input) function signature like this:
 ```go
 type CnIn[In any] func(*http.Request, HandleOpts) (In, error)
 ```
 
-This allows for adapting the constructor to various scenarios, like path, or query parameters, and JSON input. It's important that a `CnIn` function may only return errors that are safe to display to the client. 
+This allows for adapting the constructor to various scenarios, like path or query parameters, and JSON input. It's important that a `CnIn` function may only return errors that are safe to display to the client.
 
-Furthermore, `CnIn` can not return an HTTP status code. An error from the constructor will, in the current implementation, always induce an `http.StatusBadRequest`, expecting constructor errors to be the client's fault. I've thought of changing this behaviour, I don't yet see a good reason to do so.
+Furthermore, `CnIn` cannot return an HTTP status code. An error from the constructor will, in the current implementation, always induce an `http.StatusBadRequest`, expecting constructor errors to be the client's fault. I've thought of changing this behavior, but I don't yet see a good reason to do so.
 
 Then, the function that actually executes the business logic can be defined as:
 ```go
 type Exec[In, Out any] func(context.Context, In, HandleOpts) (Out, int, error)
 ```
 
-Again, it takes Input, does something, and returns Output. Returned error messages are expected to be client-safe, `Exec[In, Out]` is therefore still a Handler or Controller. Services on the other hand, contain explicit business logic and may leak internal information.
+Again, it takes input, does something, and returns output. Returned error messages are expected to be client-safe, so `Exec[In, Out]` is therefore still a Handler or Controller. Services, on the other hand, contain explicit business logic and may leak internal information.
 
-Now, what is `HandleOpts`? `HandleOpts` are the functional options, passed to the `gwu.Handle` func we'll touch on in a sec.
-`HandleOpts` should be used to e.g. set a logger, allowing contextualize logging inside the endpoint's `Exec` func.
+Now, what is `HandleOpts`? `HandleOpts` are the functional options, passed to the `gwu.Handle` func we'll touch on in a sec. `HandleOpts` should be used to, e.g., set a logger, allowing contextual logging inside the endpoint's `Exec` func.
 ```go
 type HandleOpts struct {
 	Log Logger
@@ -120,7 +119,7 @@ func Log(log Logger) HandleOptsFunc {
 }
 ```
 
-The `Handle[In, Out]` func is crucial now, it puts everything together:
+The `Handle[In, Out]` func is crucial now; it puts everything together:
 ```go
 func Handle[In, Out any](inFn CnIn[In], fn Exec[In, Out], optFns ...HandleOptsFunc) http.Handler {
 	var opts HandleOpts
@@ -196,7 +195,7 @@ func (c *PoemController) ByID(_ context.Context, id ID, opts gwu.HandleOpts) (Po
 }
 ```
 
-Leveraging the flexibility of `Exec[In, Out]` Gwu also provides a very simple, yet powerful validation func out of the box:
+Leveraging the flexibility of `Exec[In, Out]`, Gwu also provides a very simple yet powerful validation function out of the box:
 ```go
 // ValIn Exec validates the input with the given validation function.
 // If the validation fails, it returns an http.StatusBadRequest and the validation error.
@@ -218,7 +217,7 @@ func ValIn[In, Out any](fn Exec[In, Out], fnVal func(in In) error) Exec[In, Out]
 }
 ```
 
-Now, you've seen almost all the important code of Gwu. Simple, right? So, let's examine how this could look like in real applications.
+Now, you've seen almost all the important code of Gwu. Simple, right? So, let's examine how this could look in real applications.
 
 ### Demo
 > Important: For a complete example, [see the code on GitHub](https://github.com/reqlabs/gwu/tree/v0.1.0/examples/poem).
@@ -265,7 +264,7 @@ func (c *PoemController) Create(_ context.Context, poem Poem, opts gwu.HandleOpt
 }
 ```
 
-Contextualize logging, btw. great thing ^^, you can add it like this:
+Contextualized logging, btw, great thing ^^, you can add it like this:
 ```go
 log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
