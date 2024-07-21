@@ -1,7 +1,7 @@
 +++
 title = 'Generic Web Handlers in Go'
 date = 2024-07-21T12:12:12+02:00
-published = false
+published = true
 tags = ['Software Engineering', 'Go', 'Web Development', 'Gwu']
 +++
 
@@ -95,7 +95,7 @@ type CnIn[In any] func(*http.Request, HandleOpts) (In, error)
 
 This allows for adapting the constructor to various scenarios, like path or query parameters, and JSON input. It's important that a `CnIn` function may only return errors that are safe to display to the client.
 
-Furthermore, `CnIn` cannot return an HTTP status code. An error from the constructor will, in the current implementation, always induce an `http.StatusBadRequest`, expecting constructor errors to be the client's fault. I've thought of changing this behavior, but I don't yet see a good reason to do so.
+Furthermore, `CnIn` cannot return an HTTP status code. An error from the constructor will, in the current implementation, always induce an `http.StatusBadRequest`, expecting constructor errors to be the client's fault. I've thought of changing this behavior, but I don't see a good reason to do so yet.
 
 Then, the function that actually executes the business logic can be defined as:
 ```go
@@ -264,7 +264,7 @@ func (c *PoemController) Create(_ context.Context, poem Poem, opts gwu.HandleOpt
 }
 ```
 
-Contextualized logging, btw, great thing ^^, you can add it like this:
+Contextualized logging, by the way, is a great thing. You can add it like this:
 ```go
 log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
@@ -274,14 +274,22 @@ mux.Handle("POST /poem", gwu.Handle(gwu.JSON[Poem](), gwu.ValIn(ctrl.Create, Val
 ```
 
 ## Gwu Is Born!
+From this idea, you might have already noticed, a little package grew.
 
 ### The Idea
+Gwu, short for Generic Web Utility, was conceived to provide a straightforward, no-nonsense approach to building web handlers in Go. Gwu offers utility functionality for web handler creation without bloat. The package is simple and relies solely on the Go standard library.
 
 ### What Does the Future Hold?
+I hope to see Gwu evolving in a utility-style manner, focusing on practical, minimalistic additions. Gwu is not meant to be a comprehensive framework but rather a library of useful utilities. I aim to keep external dependencies minimal, relying primarily on the standard library. Any new features or functions will be designed to simplify common tasks without over-complicating the codebase. I am open to ideas and contributions from you ;).
 
 ## Discussion: Is This Too Complex?
-- idk, maybe yes? lmk!
+Is this approach too complex? I don’t know, maybe it is. Let me know! I like the approach, even though it imposes some abstraction. I'm happy to be convinced otherwise if someone has a better approach. Your feedback is crucial. If you find the approach too complex or have suggestions for improvement, please share!
 
 ## Conclusion
-- Don't take all of this too serious, if you like it, give it a spin. If not, ignore it, or better: tell me why!
-- Gwu is expected to grow in the future, I'll try to put my personal thoughts and best practices there, while experimenting with smart abstractions that integrate well in std compliant environment.
+In conclusion, don't take all of this too seriously. If you like the idea, give Gwu a spin. If not, feel free to ignore it, or better yet, tell me why!
+
+Gwu is expected to grow and evolve. I will continue to incorporate my personal thoughts and best practices while experimenting with smart abstractions that fit well in a standard-compliant environment. The goal is not to create a comprehensive framework but to offer a utility library that provides helpful functionality wherever it’s needed. 
+
+I hope to maintain these ideals throughout Gwu’s development journey, but only time will tell. I genuinely look forward to seeing contributions from the community. Your input might help to shape Gwu.
+
+Thank you for taking the time to read about Gwu! Have an awesome day! :))
