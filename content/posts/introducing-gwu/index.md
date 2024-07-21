@@ -1,20 +1,21 @@
 +++
 title = 'Generic Web Handlers in Go'
-date = 2024-07-20T22:22:00+02:00
+date = 2024-07-21T12:12:12+02:00
 published = false
 tags = ['Software Engineering', 'Go', 'Web Development', 'Gwu']
 +++
 
-> The idea stems from a very interesting [Reddit thread](https://www.reddit.com/r/golang/comments/1dxat13/whats_a_really_good_blog_post_youve_read_lately/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button) which lead me to [Willem Schots' blog post](https://www.willem.dev/articles/generic-http-handlers/), giving me a starting point for further advancing the idea of generic web handlers.
+> The idea stems from a very interesting [Reddit thread](https://www.reddit.com/r/golang/comments/1dxat13/whats_a_really_good_blog_post_youve_read_lately/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button), which led me to [Willem Schots' blog post](https://www.willem.dev/articles/generic-http-handlers/), giving me a starting point for further advancing the idea of generic web handlers.
 
-> Heads up: This post and implementation for generic web handlers focuses on APIs (with JSON). There is no other data-interchange format, HTML rendering or templating involved. However, there should be no issue in extending the idea for further use cases, and I encourage you to do so. Please share your ideas and implementations with me! :)
+> Heads up: This post and implementation for generic web handlers focuses on APIs (with JSON). There is currently no other data-interchange format, HTML rendering, or templating implemented. I plan on extending this in the future. Please share your ideas with me! :)
+
+The [code is publicly available on GitHub](https://github.com/reqlabs/gwu), with an [example poem API](https://github.com/reqlabs/gwu/tree/v0.1.0/examples/poem) showcasing the usage of [the initial version](https://github.com/reqlabs/gwu/tree/v0.1.0).
 
 ## Web Handlers in Go
-I'll keep this simple, as I expect you to be familiar with the basics of Go and `net/http` already.
-Web handlers take an incoming HTTP request, perform some action, and write an HTTP response.
+I'll keep this simple, as I expect you to be familiar with the basics of Go and `net/http` already. Web handlers take an incoming HTTP request, perform some action, and write an HTTP response.
 
 This "action" often involves some CRUD:
-- *Create* an entity: Create a peom in a peom store.
+- *Create* an entity: Create a poem in a poem store.
 - *Read* an entity: List all poems from that store.
 - *Update* an entity: Update a poem in the store.
 - *Delete* an entity: Delete a certain poem from that store.
@@ -40,7 +41,7 @@ You might notice a potential pattern here:
 3. Data goes out
 
 ![Illustration of the pattern](images/beauty-of-the-idea.webp)
- 
+
 This pattern will most likely be repeated in every handler, with only the specifics changing. Have you noticed it in your own code bases, maybe even written a helper function to reduce boilerplate?
 
 The greatest thing: If we know that the output is always JSON, and the business logic can be arbitrary, same as the input, as long as it's processed to the business logic's satisfaction, we can abstract this pattern into a generic handler.
@@ -56,7 +57,7 @@ function handle(r Request) -> Response {
 }
 ```
 
-A basic, working Go implementation of this pseudocode can be found in [Willem Schots' blog post](https://www.willem.dev/articles/generic-http-handlers/). However, I wanted to explore this idea further, so let's go. 
+A basic, working Go implementation of this pseudocode can be found in [Willem Schots' blog post](https://www.willem.dev/articles/generic-http-handlers/). However, I wanted to explore this idea further, so let's go.
 
 ## Upfront Considerations
 The point where I immediately deviated from Schots' implementation was his definition of the generic handler function:
@@ -70,26 +71,208 @@ func Handle[In any, Out any](f TargetFunc[In, Out]) http.Handler {
 }
 ```
 
-What about the HTTP status codes? This question struck my mind. In Schots' example, the `Handle` func writes `http.StatusBadRequest` (400) to the response when the provided `TargetFunc` returns an error. However, I would highly doubt that business logic only errors with bad requests, what about forbidden (403), not found (404), internal server error (500), ...?
+What about the HTTP status codes? This question struck my mind. In Schots' example, the `Handle` func writes `http.StatusBadRequest` (400) to the response when the provided `TargetFunc` returns an error. However, I highly doubt that business logic only errors with bad requests. What about forbidden (403), not found (404), internal server error (500), etc.?
 
-This might seem trivial but what's indicated here isn't: The executed `TargetFunc` is not service logic, it leaks to the outside and is therefore still `Handler` or `Controller` logic. Therefore, I also disagree with Schots' naming of `service.go` and `Service.CreateNote`/`Service.UpdateNote`. 
+This might seem trivial but what's indicated here isn't: The executed `TargetFunc` is not service logic; it leaks to the outside and is therefore still `Handler` or `Controller` logic. Therefore, I also disagree with Schots' naming of `service.go` and `Service.CreateNote`/`Service.UpdateNote`.
 
-A `TargetFunc` must be aware of its context: The errors it returns are visible to client, and it might indicate the HTTP status code which is written to client on failure. Keep this in mind for later, when we define our own function signature.
+A `TargetFunc` must be aware of its context: The errors it returns are visible to the client, and it might indicate the HTTP status code, which is written to the client on failure. Keep this in mind for later, when we define our own function signature.
 
-Furthermore, Schots' does not provide a way to modify the `In`. He states this himself:
-> If you’re dealing with complex requests you could inject some kind of generic constructor function into the Handle function: `type ConstructorFunc[In any](r *http.Request)(In, error)`
+Furthermore, Schots does not provide a way to modify the `In`. He states this himself:
+> If you’re dealing with complex requests you could inject some kind of generic constructor function into the Handle function: `type ConstructorFunc[In any](r *http.Request) (In, error)`
 
 This is not only important for complex requests but absolutely necessary if you provide certain info (like an ID) to your endpoint via query parameters. It can also be useful for validations, but we'll inspect that in more detail later.
 
-Also, Schots' misses, IMHO, some extra options to pass to a handler, like a logger. I'll touch on that later, again. ;) 
+Also, Schots misses, IMHO, some extra options to pass to a handler, like a logger. I'll touch on that later, again. ;)
 
 ## Generic Web Handlers
-
 Now, with fundamentals and considerations out of the way, let's start to implement our own version of generic web handlers.
 
 ### Implementation
+Firstly, from the incoming request `In` must be constructed, we'll define the `CnIn[In]` (construct input) function signature like this:
+```go
+type CnIn[In any] func(*http.Request, HandleOpts) (In, error)
+```
+
+This allows for adapting the constructor to various scenarios, like path, or query parameters, and JSON input. It's important that a `CnIn` function may only return errors that are safe to display to the client. 
+
+Furthermore, `CnIn` can not return an HTTP status code. An error from the constructor will, in the current implementation, always induce an `http.StatusBadRequest`, expecting constructor errors to be the client's fault. I've thought of changing this behaviour, I don't yet see a good reason to do so.
+
+Then, the function that actually executes the business logic can be defined as:
+```go
+type Exec[In, Out any] func(context.Context, In, HandleOpts) (Out, int, error)
+```
+
+Again, it takes Input, does something, and returns Output. Returned error messages are expected to be client-safe, `Exec[In, Out]` is therefore still a Handler or Controller. Services on the other hand, contain explicit business logic and may leak internal information.
+
+Now, what is `HandleOpts`? `HandleOpts` are the functional options, passed to the `gwu.Handle` func we'll touch on in a sec.
+`HandleOpts` should be used to e.g. set a logger, allowing contextualize logging inside the endpoint's `Exec` func.
+```go
+type HandleOpts struct {
+	Log Logger
+}
+
+type HandleOptsFunc func(opt *HandleOpts)
+
+func Log(log Logger) HandleOptsFunc {
+	return func(opt *HandleOpts) {
+		opt.Log = log
+	}
+}
+```
+
+The `Handle[In, Out]` func is crucial now, it puts everything together:
+```go
+func Handle[In, Out any](inFn CnIn[In], fn Exec[In, Out], optFns ...HandleOptsFunc) http.Handler {
+	var opts HandleOpts
+	for _, fn := range optFns {
+		fn(&opts)
+	}
+
+	if opts.Log == nil {
+		opts.Log = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		in, err := inFn(r, opts)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		out, code, err := fn(r.Context(), in, opts)
+		if err != nil {
+			http.Error(w, err.Error(), code)
+			return
+		}
+
+		IntoJSON(w, opts.Log, out, code)
+	})
+}
+```
+
+We execute the input constructor with the response and options, the business logic with the context, input, and options, and lastly, parse everything into JSON and write it to the response.
+
+Now, we can define commonly used `CnIn[In]` functions:
+```go
+// JSON CnIn decodes the request body into the given data type In.
+func JSON[In any]() CnIn[In] {
+	return func(r *http.Request, _ HandleOpts) (In, error) {
+		var in In
+		err := json.NewDecoder(r.Body).Decode(&in)
+		if err != nil {
+			return in, ErrDecodeRequest
+		}
+
+		return in, nil
+	}
+}
+
+// PathVal CnIn reads a path value with the given key.
+func PathVal(key string) CnIn[string] {
+	return func(r *http.Request, _ HandleOpts) (string, error) {
+		return r.PathValue(key), nil
+	}
+}
+
+// Empty CnIn always returns nil and no error.
+// Use Empty for endpoints that do not require input.
+func Empty() CnIn[any] {
+	return func(_ *http.Request, _ HandleOpts) (any, error) {
+		return nil, nil
+	}
+}
+```
+
+Afterward, `In` is constructed and the business logic can be executed using `Exec`. This `Exec[In, Out]` might look like this:
+```go
+func (c *PoemController) ByID(_ context.Context, id ID, opts gwu.HandleOpts) (Poem, int, error) {
+    poem, err := c.store.Poem(id)
+    if err != nil {
+        opts.Log.Debug("requested non-existent poem", "id", id)
+        return poem, http.StatusNotFound, ErrNotFound
+    }
+
+    return poem, http.StatusOK, nil
+}
+```
+
+Leveraging the flexibility of `Exec[In, Out]` Gwu also provides a very simple, yet powerful validation func out of the box:
+```go
+// ValIn Exec validates the input with the given validation function.
+// If the validation fails, it returns an http.StatusBadRequest and the validation error.
+// Afterward, it calls the given Exec function.
+//
+// Use ValIn to validate the input before executing the logic.
+//
+// ValIn expects the validation function to return an error that is safe to display to the client.
+func ValIn[In, Out any](fn Exec[In, Out], fnVal func(in In) error) Exec[In, Out] {
+	var out Out
+	return func(ctx context.Context, in In, opts HandleOpts) (Out, int, error) {
+		err := fnVal(in)
+		if err != nil {
+			return out, http.StatusBadRequest, err
+		}
+
+		return fn(ctx, in, opts)
+	}
+}
+```
+
+Now, you've seen almost all the important code of Gwu. Simple, right? So, let's examine how this could look like in real applications.
 
 ### Demo
+> Important: For a complete example, [see the code on GitHub](https://github.com/reqlabs/gwu/tree/v0.1.0/examples/poem).
+
+Since our endpoint logic is aware of its HTTP context, we'll call it `Controller`. We'll also use Go's standard mux.
+```go
+// Initialize the controller with an in-memory store
+ctrl := &Controller{store: make(map[string]Poem)}
+
+// Create a handler using gwu.Handle
+h := gwu.Handle(gwu.PathVal("name"), ctrl.ByName)
+
+// Register the handler with the mux
+mux.Handle("GET /poem/{name}", h)
+
+// Handler function in the Controller
+func (c *Controller) ByName(_ context.Context, name string, _ gwu.HandleOpts) (Poem, int, error) {
+    poem, err := c.store.PoemByName(name)
+    if err != nil {
+        return poem, http.StatusNotFound, ErrNotFound
+    }
+
+    return poem, http.StatusOK, nil
+}
+```
+
+Adding a creation route, including data model validation, is now as simple as this:
+```go
+type Poem struct { ... }
+
+func ValidateToCreate(p Poem) error { ... }
+
+mux.Handle("POST /poem", gwu.Handle(gwu.JSON[Poem](), gwu.ValIn(ctrl.Create, ValidateToCreate)))
+
+func (c *PoemController) Create(_ context.Context, poem Poem, opts gwu.HandleOpts) (Poem, int, error) {
+    poem.ID = NewID()
+    err := c.store.Add(poem)
+    if err != nil {
+        opts.Log.Debug("could not create poem", "error", err, "poem", poem)
+        return poem, http.StatusInternalServerError, ErrCouldNotCreate
+    }
+    
+    return poem, http.StatusCreated, nil
+}
+```
+
+Contextualize logging, btw. great thing ^^, you can add it like this:
+```go
+log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+mux.Handle("POST /poem", gwu.Handle(gwu.JSON[Poem](), gwu.ValIn(ctrl.Create, ValidateToCreate),
+    gwu.Log(log.With("method", "POST", "route", "/poem"))),
+)
+```
 
 ## Gwu Is Born!
 
